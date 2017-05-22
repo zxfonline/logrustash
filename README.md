@@ -1,14 +1,26 @@
 # Logstash hook for logrus <img src="http://i.imgur.com/hTeVwmJ.png" width="40" height="40" alt=":walrus:" class="emoji" title=":walrus:" /> [![Build Status](https://travis-ci.org/bshuster-repo/logrus-logstash-hook.svg?branch=master)](https://travis-ci.org/bshuster-repo/logrus-logstash-hook)
 Use this hook to send the logs to [Logstash](https://www.elastic.co/products/logstash) over both UDP and TCP.
 
+# Important notes
+
+This a fork from [github.com/bshuster-repo/logrus-logstash-hook](https://github.com/bshuster-repo/logrus-logstash-hook.git) repo.
+
+[ripcurld0](https://github.com/ripcurld0) going to rewrite original hook but there is no estimates when it will be ready for using in production. 
+And more important is that he declines all pull requests with new features. 
+So the main goal of this fork is to add some new features and use logstash hook until [ripcurld0](https://github.com/ripcurld0) finish his work.
+
+Added features:
+
+* [Async mode](#asyncmode). You can send log messages without blocking logic.
+
 ## Usage
 
 ```go
 package main
 
 import (
-        "github.com/sirupsen/logrus"
-        "github.com/bshuster-repo/logrus-logstash-hook"
+	"github.com/cheshir/logrustash"
+    "github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -51,7 +63,7 @@ Example:
 
 ```go
 log := logrus.New()
-hook, err := logrus_logstash.NewAsyncHook("tcp", "172.17.0.2:9999", "myappName")
+hook, err := logrustash.NewAsyncHook("tcp", "172.17.0.2:9999", "myappName")
 if err != nil {
         log.Fatal(err)
 }
