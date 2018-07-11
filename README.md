@@ -8,16 +8,14 @@ Use this hook to send the logs to [Logstash](https://www.elastic.co/products/log
 
 # Important notes
 
-This a fork from [github.com/bshuster-repo/logrus-logstash-hook](https://github.com/bshuster-repo/logrus-logstash-hook.git) repo.
-
-[ripcurld0](https://github.com/ripcurld0) going to rewrite original hook but there is no estimates when it will be ready for using in production.
-And more important is that he declines all pull requests with new features.
-So the main goal of this fork is to add some new features and use logstash hook until [ripcurld0](https://github.com/ripcurld0) finish his work.
+This a patched version of *old* [github.com/bshuster-repo/logrus-logstash-hook](https://github.com/bshuster-repo/logrus-logstash-hook.git) repo.
 
 Added features:
 
 * [Async mode](#async-mode). You can send log messages without blocking logic.
 * [Reconnect](#reconnect).
+
+*!* Currently there is no sense to use it. You can get the same behaviour with newest version of package and "smart" TCP connection that will provide reconnects and async behaviour.
 
 ## Usage
 
