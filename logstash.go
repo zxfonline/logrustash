@@ -1,6 +1,7 @@
 package logrustash
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"net"
@@ -40,8 +41,8 @@ func NewHook(protocol, address, appName string) (*Hook, error) {
 // NewAsyncHook creates a new hook to a Logstash instance, which listens on
 // `protocol`://`address`.
 // Logs will be sent asynchronously.
-func NewAsyncHook(protocol, address, appName string) (*Hook, error) {
-	return NewAsyncHookWithFields(protocol, address, appName, make(logrus.Fields))
+func NewAsyncHook(ctx context.Context, wg *sync.WaitGroup, protocol, address, appName string) (*Hook, error) {
+	return NewAsyncHookWithFields(ctx, wg, protocol, address, appName, make(logrus.Fields))
 }
 
 // NewHookWithConn creates a new hook to a Logstash instance, using the supplied connection.
@@ -51,8 +52,8 @@ func NewHookWithConn(conn net.Conn, appName string) (*Hook, error) {
 
 // NewAsyncHookWithConn creates a new hook to a Logstash instance, using the supplied connection.
 // Logs will be sent asynchronously.
-func NewAsyncHookWithConn(conn net.Conn, appName string) (*Hook, error) {
-	return NewAsyncHookWithFieldsAndConn(conn, appName, make(logrus.Fields))
+func NewAsyncHookWithConn(ctx context.Context, wg *sync.WaitGroup, conn net.Conn, appName string) (*Hook, error) {
+	return NewAsyncHookWithFieldsAndConn(ctx, wg, conn, appName, make(logrus.Fields))
 }
 
 // NewHookWithFields creates a new hook to a Logstash instance, which listens on
@@ -64,8 +65,8 @@ func NewHookWithFields(protocol, address, appName string, alwaysSentFields logru
 // NewAsyncHookWithFields creates a new hook to a Logstash instance, which listens on
 // `protocol`://`address`. alwaysSentFields will be sent with every log entry.
 // Logs will be sent asynchronously.
-func NewAsyncHookWithFields(protocol, address, appName string, alwaysSentFields logrus.Fields) (*Hook, error) {
-	return NewAsyncHookWithFieldsAndPrefix(protocol, address, appName, alwaysSentFields, "")
+func NewAsyncHookWithFields(ctx context.Context, wg *sync.WaitGroup, protocol, address, appName string, alwaysSentFields logrus.Fields) (*Hook, error) {
+	return NewAsyncHookWithFieldsAndPrefix(ctx, wg, protocol, address, appName, alwaysSentFields, "")
 }
 
 // NewHookWithFieldsAndPrefix creates a new hook to a Logstash instance, which listens on
@@ -86,13 +87,13 @@ func NewHookWithFieldsAndPrefix(protocol, address, appName string, alwaysSentFie
 // NewAsyncHookWithFieldsAndPrefix creates a new hook to a Logstash instance, which listens on
 // `protocol`://`address`. alwaysSentFields will be sent with every log entry. prefix is used to select fields to filter.
 // Logs will be sent asynchronously.
-func NewAsyncHookWithFieldsAndPrefix(protocol, address, appName string, alwaysSentFields logrus.Fields, prefix string) (*Hook, error) {
+func NewAsyncHookWithFieldsAndPrefix(ctx context.Context, wg *sync.WaitGroup, protocol, address, appName string, alwaysSentFields logrus.Fields, prefix string) (*Hook, error) {
 	hook, err := NewHookWithFieldsAndPrefix(protocol, address, appName, alwaysSentFields, prefix)
 	if err != nil {
 		return nil, err
 	}
 	hook.AsyncBufferSize = 8192
-	hook.makeAsync()
+	hook.makeAsync(ctx, wg)
 
 	return hook, err
 }
@@ -104,8 +105,8 @@ func NewHookWithFieldsAndConn(conn net.Conn, appName string, alwaysSentFields lo
 
 // NewAsyncHookWithFieldsAndConn creates a new hook to a Logstash instance using the supplied connection.
 // Logs will be sent asynchronously.
-func NewAsyncHookWithFieldsAndConn(conn net.Conn, appName string, alwaysSentFields logrus.Fields) (*Hook, error) {
-	return NewAsyncHookWithFieldsAndConnAndPrefix(conn, appName, alwaysSentFields, "")
+func NewAsyncHookWithFieldsAndConn(ctx context.Context, wg *sync.WaitGroup, conn net.Conn, appName string, alwaysSentFields logrus.Fields) (*Hook, error) {
+	return NewAsyncHookWithFieldsAndConnAndPrefix(ctx, wg, conn, appName, alwaysSentFields, "")
 }
 
 //NewHookWithFieldsAndConnAndPrefix creates a new hook to a Logstash instance using the suppolied connection and prefix.
@@ -115,9 +116,9 @@ func NewHookWithFieldsAndConnAndPrefix(conn net.Conn, appName string, alwaysSent
 
 // NewAsyncHookWithFieldsAndConnAndPrefix creates a new hook to a Logstash instance using the suppolied connection and prefix.
 // Logs will be sent asynchronously.
-func NewAsyncHookWithFieldsAndConnAndPrefix(conn net.Conn, appName string, alwaysSentFields logrus.Fields, prefix string) (*Hook, error) {
+func NewAsyncHookWithFieldsAndConnAndPrefix(ctx context.Context, wg *sync.WaitGroup, conn net.Conn, appName string, alwaysSentFields logrus.Fields, prefix string) (*Hook, error) {
 	hook := &Hook{conn: conn, appName: appName, alwaysSentFields: alwaysSentFields, hookOnlyPrefix: prefix}
-	hook.makeAsync()
+	hook.makeAsync(ctx, wg)
 
 	return hook, nil
 }
@@ -129,8 +130,8 @@ func NewFilterHook() *Hook {
 
 // NewAsyncFilterHook makes a new hook which does not forward to logstash, but simply enforces the prefix rules.
 // Logs will be sent asynchronously.
-func NewAsyncFilterHook() *Hook {
-	return NewAsyncFilterHookWithPrefix("")
+func NewAsyncFilterHook(ctx context.Context, wg *sync.WaitGroup) *Hook {
+	return NewAsyncFilterHookWithPrefix(ctx, wg, "")
 }
 
 // NewFilterHookWithPrefix make a new hook which does not forward to logstash, but simply enforces the specified prefix.
@@ -140,20 +141,32 @@ func NewFilterHookWithPrefix(prefix string) *Hook {
 
 // NewAsyncFilterHookWithPrefix make a new hook which does not forward to logstash, but simply enforces the specified prefix.
 // Logs will be sent asynchronously.
-func NewAsyncFilterHookWithPrefix(prefix string) *Hook {
+func NewAsyncFilterHookWithPrefix(ctx context.Context, wg *sync.WaitGroup, prefix string) *Hook {
 	hook := NewFilterHookWithPrefix(prefix)
-	hook.makeAsync()
-
+	hook.makeAsync(ctx, wg)
 	return hook
 }
 
-func (h *Hook) makeAsync() {
+func (h *Hook) makeAsync(ctx context.Context, wg *sync.WaitGroup) {
 	h.fireChannel = make(chan *logrus.Entry, h.AsyncBufferSize)
-
+	wg.Add(1)
 	go func() {
-		for entry := range h.fireChannel {
-			if err := h.sendMessage(entry); err != nil {
-				fmt.Println("Error during sending message to logstash:", err)
+		defer wg.Done()
+		for {
+			select {
+			case <-ctx.Done():
+				select {
+				case entry := <-h.fireChannel:
+					if err := h.sendMessage(entry); err != nil {
+						fmt.Println("Error during sending message to logstash:", err)
+					}
+				default:
+					return
+				}
+			case entry := <-h.fireChannel:
+				if err := h.sendMessage(entry); err != nil {
+					fmt.Println("Error during sending message to logstash:", err)
+				}
 			}
 		}
 	}()
